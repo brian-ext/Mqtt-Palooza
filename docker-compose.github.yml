@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  frankenstein-db:
+    image: ghcr.io/scrapedat/frankenstein-db:latest
+    container_name: frankenstein-db-prod
+    restart: unless-stopped
+    volumes:
+      - frankenstein_sqlite:/data/sqlite
+      - frankenstein_blobs:/data/blobs
+      - frankenstein_logs:/data/logs
+    networks:
+      - ai-scraper-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sqlite3; sqlite3.connect('/data/sqlite/website_evolution.db').execute('SELECT 1')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "org.opencontainers.image.licenses=AGPL-3.0"
+      - "org.opencontainers.image.vendor=AI Scraper Contributors"
+
+  redis:
+    image: redis:7-alpine
+    container_name: frankenstein-redis-prod
+    restart: unless-stopped
+    volumes:
+      - frankenstein_redis:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    networks:
+      - ai-scraper-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ai-scraper-vm:
+    image: ghcr.io/scrapedat/ai-scraper-vm:latest
+    container_name: ai-scraper-vm-prod
+    restart: unless-stopped
+    depends_on:
+      frankenstein-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ai_scraper_data:/app/data
+    networks:
+      - ai-scraper-network
+    environment:
+      - FRANKENSTEIN_DB_HOST=frankenstein-db
+      - REDIS_HOST=redis
+      - MQTT_BROKER_HOST=mqtt-broker
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    labels:
+      - "org.opencontainers.image.licenses=AGPL-3.0"
+      - "org.opencontainers.image.vendor=AI Scraper Contributors"
+
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: ai-scraper-mqtt-prod
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mqtt_config:/mosquitto/config
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    networks:
+      - ai-scraper-network
+
+  dashboard:
+    image: ghcr.io/scrapedat/ai-scraper-dashboard:latest
+    container_name: ai-scraper-dashboard-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mqtt-broker
+    environment:
+      - MQTT_BROKER_URL=ws://mqtt-broker:9001
+      - API_BASE_URL=http://ai-scraper-vm:8000
+    networks:
+      - ai-scraper-network
+    labels:
+      - "org.opencontainers.image.licenses=AGPL-3.0"
+      - "org.opencontainers.image.vendor=AI Scraper Contributors"
+
+volumes:
+  frankenstein_sqlite:
+    driver: local
+  frankenstein_blobs:
+    driver: local
+  frankenstein_logs:
+    driver: local
+  frankenstein_redis:
+    driver: local
+  ai_scraper_data:
+    driver: local
+  mqtt_config:
+    driver: local
+  mqtt_data:
+    driver: local
+  mqtt_log:
+    driver: local
+
+networks:
+  ai-scraper-network:
+    driver: bridge
+    name: ai-scraper-network
