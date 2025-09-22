@@ -1,0 +1,38 @@
+# Sensitive files - DO NOT commit to repository
+nginx/.htpasswd
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker volumes (data persists locally)
+ollama_data/
+frankenstein_data/
+scraper_data/
+scraper_logs/
+mosquitto_data/
+mosquitto_logs/
+
+# IDE and editor files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/

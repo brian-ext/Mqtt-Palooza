@@ -62,7 +62,16 @@ Your AI Scraper System now includes **Ollama integration** with both small and l
 docker-compose -f docker-compose.ollama.yml up -d
 ```
 
-### 2. Setup Models
+### 2. Setup Authentication (Required)
+```bash
+# Generate secure authentication files locally
+./setup-auth.sh
+
+# This creates nginx/.htpasswd with hashed passwords
+# ⚠️  NEVER commit this file to version control!
+```
+
+### 3. Setup Models
 ```bash
 # Download both models
 ./manage-ollama.sh pull
@@ -74,7 +83,7 @@ docker-compose -f docker-compose.ollama.yml up -d
 ./manage-ollama.sh test-large
 ```
 
-### 3. Use the API
+### 4. Use the API
 ```bash
 # 🔒 External access (authenticated proxy)
 curl -u ollama:scraper http://localhost:11435/api/generate -d '{
@@ -92,7 +101,27 @@ curl http://ollama:11434/api/generate -d '{
 }'
 ```
 
-## 🔒 Security Features
+## � Authentication Setup
+
+### Secure by Default
+- **No credentials in version control**: `.htpasswd` is in `.gitignore`
+- **Local generation**: Run `./setup-auth.sh` to create credentials
+- **Hashed passwords**: Uses APR1 hashing for security
+
+### Default Credentials (Change in Production!)
+- **Username**: `ollama`
+- **Password**: `scraper`
+
+### Changing Credentials
+```bash
+# Run setup script and choose custom credentials
+./setup-auth.sh
+
+# Or manually create .htpasswd
+printf "youruser:$(openssl passwd -apr1 yourpassword)\n" > nginx/.htpasswd
+```
+
+## �🔒 Security Features
 
 ### Network Isolation
 - **Internal Network Only**: Ollama only accessible within Docker network
