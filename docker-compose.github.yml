@@ -35,31 +35,26 @@ services:
       timeout: 10s
       retries: 3
 
-  ai-scraper-vm:
-    image: ghcr.io/scrapedat/ai-scraper-vm:latest
-    container_name: ai-scraper-vm-prod
-    restart: unless-stopped
-    depends_on:
-      frankenstein-db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ai_scraper_data:/app/data
-    networks:
-      - ai-scraper-network
-    environment:
-      - FRANKENSTEIN_DB_HOST=frankenstein-db
-      - REDIS_HOST=redis
-      - MQTT_BROKER_HOST=mqtt-broker
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
-    labels:
-      - "org.opencontainers.image.licenses=AGPL-3.0"
-      - "org.opencontainers.image.vendor=AI Scraper Contributors"
+   ai-scraper-vm:
+     image: ghcr.io/scrapedat/ai-scraper-vm:latest
+     container_name: ai-scraper-vm-prod
+     restart: unless-stopped
+     depends_on:
+       frankenstein-db:
+         condition: service_healthy
+       redis:
+         condition: service_healthy
+     volumes:
+       - ai_scraper_data:/app/data
+     networks:
+       - ai-scraper-network
+     environment:
+       - FRANKENSTEIN_DB_HOST=frankenstein-db
+       - REDIS_HOST=redis
+       - MQTT_BROKER_HOST=mqtt-broker
+     labels:
+       - "org.opencontainers.image.licenses=AGPL-3.0"
+       - "org.opencontainers.image.vendor=AI Scraper Contributors"
 
   mqtt-broker:
     image: eclipse-mosquitto:2.0

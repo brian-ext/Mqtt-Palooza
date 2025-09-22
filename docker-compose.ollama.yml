@@ -29,15 +29,15 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
-    environment:
-      - DATABASE_URL=postgresql://frankenstein:frankenstein@frankenstein-db:5432/scraper
-      - OLLAMA_HOST=http://ollama-proxy:80
-      - OLLAMA_USERNAME=ollama
-      - OLLAMA_PASSWORD=scraper
-      - SMALL_MODEL=llama3.1:8b
-      - LARGE_MODEL=llama3.1:70b
-      - MQTT_BROKER=mosquitto
-      - MQTT_PORT=1883
+     environment:
+       - DATABASE_URL=postgresql://frankenstein:frankenstein@frankenstein-db:5432/scraper
+       - OLLAMA_HOST=http://ollama-proxy:80
+       - OLLAMA_USERNAME=${OLLAMA_USERNAME:-ollama}
+       - OLLAMA_PASSWORD=${OLLAMA_PASSWORD:-scraper}
+       - SMALL_MODEL=llama3.1:8b
+       - LARGE_MODEL=llama3.1:70b
+       - MQTT_BROKER=mosquitto
+       - MQTT_PORT=1883
     volumes:
       - scraper_data:/app/data
       - scraper_logs:/app/logs
