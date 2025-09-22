@@ -76,20 +76,38 @@ docker-compose -f docker-compose.ollama.yml up -d
 
 ### 3. Use the API
 ```bash
-# Small model for fast tasks
-curl http://localhost:11434/api/generate -d '{
+# 🔒 External access (authenticated proxy)
+curl -u ollama:scraper http://localhost:11435/api/generate -d '{
   "model": "llama3.1:8b",
   "prompt": "Extract product names from this HTML...",
   "stream": false
 }'
 
-# Large model for complex analysis
-curl http://localhost:11434/api/generate -d '{
+# 🏠 Internal access (from containers - no auth needed)
+# AI Scraper VM connects directly: http://ollama:11434
+curl http://ollama:11434/api/generate -d '{
   "model": "llama3.1:70b",
   "prompt": "Analyze this complex web scraping scenario...",
   "stream": false
 }'
 ```
+
+## 🔒 Security Features
+
+### Network Isolation
+- **Internal Network Only**: Ollama only accessible within Docker network
+- **No External Ports**: No direct external access to Ollama API
+- **Secure Proxy**: Authenticated access through nginx proxy (port 11435)
+
+### Authentication
+- **HTTP Basic Auth**: Username/password protection (`ollama`/`scraper`)
+- **Rate Limiting**: 10 requests/second per IP
+- **Method Restrictions**: Only GET, POST, DELETE allowed
+
+### Access Control
+- **Internal Services**: AI Scraper VM, Dashboard access directly (no auth)
+- **External Access**: Only through authenticated proxy
+- **Network Security**: Isolated Docker network prevents unauthorized access
 
 ## Cost Savings
 

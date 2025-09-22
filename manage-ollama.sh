@@ -15,13 +15,16 @@ NC='\033[0m'
 
 # Configuration
 OLLAMA_CONTAINER="ollama"
+OLLAMA_PROXY_URL="http://localhost:11435"
+OLLAMA_USERNAME="ollama"
+OLLAMA_PASSWORD="scraper"
 SMALL_MODEL="llama3.1:8b"
 LARGE_MODEL="llama3.1:70b"
 
 # Function to check if Ollama is running
 check_ollama() {
-    if ! docker ps | grep -q $OLLAMA_CONTAINER; then
-        echo -e "${RED}❌ Ollama container is not running${NC}"
+    if ! docker-compose -f docker-compose.ollama.yml ps ollama | grep -q "Up"; then
+        echo -e "${RED}❌ Ollama service is not running${NC}"
         echo -e "${YELLOW}Start it with: docker-compose -f docker-compose.ollama.yml up -d ollama${NC}"
         exit 1
     fi
@@ -32,10 +35,10 @@ pull_models() {
     echo -e "${BLUE}📥 Pulling AI models...${NC}"
 
     echo -e "${YELLOW}Pulling small model: $SMALL_MODEL${NC}"
-    docker exec $OLLAMA_CONTAINER ollama pull $SMALL_MODEL
+    docker-compose -f docker-compose.ollama.yml exec -T ollama ollama pull $SMALL_MODEL
 
     echo -e "${YELLOW}Pulling large model: $LARGE_MODEL${NC}"
-    docker exec $OLLAMA_CONTAINER ollama pull $LARGE_MODEL
+    docker-compose -f docker-compose.ollama.yml exec -T ollama ollama pull $LARGE_MODEL
 
     echo -e "${GREEN}✅ All models downloaded!${NC}"
 }
@@ -43,20 +46,20 @@ pull_models() {
 # Function to list available models
 list_models() {
     echo -e "${BLUE}📋 Available models:${NC}"
-    docker exec $OLLAMA_CONTAINER ollama list
+    docker-compose -f docker-compose.ollama.yml exec -T ollama ollama list
 }
 
 # Function to test small model
 test_small() {
     echo -e "${BLUE}🧪 Testing small model ($SMALL_MODEL)...${NC}"
-    docker exec $OLLAMA_CONTAINER ollama run $SMALL_MODEL "Analyze this web scraping task: extract product names and prices from an e-commerce page. Respond in JSON format." | head -20
+    docker-compose -f docker-compose.ollama.yml exec -T ollama ollama run $SMALL_MODEL "Analyze this web scraping task: extract product names and prices from an e-commerce page. Respond in JSON format." | head -20
 }
 
 # Function to test large model
 test_large() {
     echo -e "${BLUE}🧪 Testing large model ($LARGE_MODEL)...${NC}"
     echo -e "${YELLOW}Note: Large model may take 10-30 seconds to respond${NC}"
-    docker exec $OLLAMA_CONTAINER ollama run $LARGE_MODEL "Analyze this complex web scraping scenario: You need to scrape a dynamic e-commerce site with infinite scroll, handle anti-bot measures, and extract structured product data. Provide a detailed technical approach." | head -30
+    docker-compose -f docker-compose.ollama.yml exec -T ollama ollama run $LARGE_MODEL "Analyze this complex web scraping scenario: You need to scrape a dynamic e-commerce site with infinite scroll, handle anti-bot measures, and extract structured product data. Provide a detailed technical approach." | head -30
 }
 
 # Function to show model info
@@ -73,26 +76,36 @@ model_info() {
     echo "  • Use case: Deep analysis, pattern recognition, strategic decisions"
 }
 
-# Function to benchmark models
-benchmark() {
-    echo -e "${BLUE}⚡ Benchmarking models...${NC}"
+# Function to test API proxy authentication
+test_proxy() {
+    echo -e "${BLUE}🔒 Testing secure API proxy...${NC}"
 
-    echo -e "${YELLOW}Small model benchmark:${NC}"
-    time docker exec $OLLAMA_CONTAINER ollama run $SMALL_MODEL "Count from 1 to 10." > /dev/null 2>&1
+    # Test without authentication (should fail)
+    echo -e "${YELLOW}Testing without authentication:${NC}"
+    if curl -s -o /dev/null -w "%{http_code}" $OLLAMA_PROXY_URL/api/tags | grep -q "401"; then
+        echo -e "${GREEN}✅ Authentication required (good)${NC}"
+    else
+        echo -e "${RED}❌ No authentication required${NC}"
+    fi
 
-    echo -e "${YELLOW}Large model benchmark:${NC}"
-    time docker exec $OLLAMA_CONTAINER ollama run $LARGE_MODEL "Count from 1 to 5." > /dev/null 2>&1
+    # Test with authentication (should work)
+    echo -e "${YELLOW}Testing with authentication:${NC}"
+    if curl -s -u $OLLAMA_USERNAME:$OLLAMA_PASSWORD $OLLAMA_PROXY_URL/api/tags | grep -q "models"; then
+        echo -e "${GREEN}✅ Authentication successful${NC}"
+    else
+        echo -e "${RED}❌ Authentication failed${NC}"
+    fi
 }
 
 # Function to clean up models
 cleanup() {
     echo -e "${YELLOW}🧹 Cleaning up unused models...${NC}"
-    docker exec $OLLAMA_CONTAINER ollama list
+    docker-compose -f docker-compose.ollama.yml exec -T ollama ollama list
     echo -e "${RED}This will remove all models except currently loaded ones.${NC}"
     read -p "Continue? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker exec $OLLAMA_CONTAINER ollama prune
+        docker-compose -f docker-compose.ollama.yml exec -T ollama ollama prune
         echo -e "${GREEN}✅ Cleanup completed${NC}"
     fi
 }
@@ -126,6 +139,9 @@ case "${1:-help}" in
         check_ollama
         cleanup
         ;;
+    "test-proxy")
+        test_proxy
+        ;;
     "help"|*)
         echo -e "${BLUE}🧠 Ollama Model Management${NC}"
         echo ""
@@ -136,7 +152,8 @@ case "${1:-help}" in
         echo "  list       - Show available models"
         echo "  test-small - Test the small model with a simple task"
         echo "  test-large - Test the large model with a complex task"
-        echo "  info       - Show model information and use cases"
+        echo "  test-proxy   - Test secure API authentication"
+        echo "  info         - Show model information and use cases"
         echo "  benchmark  - Compare response times"
         echo "  cleanup    - Remove unused models"
         echo "  help       - Show this help"
