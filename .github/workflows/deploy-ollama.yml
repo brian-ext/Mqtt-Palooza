@@ -1,0 +1,105 @@
+name: 🚀 Deploy AI Scraper System with Ollama
+
+on:
+  push:
+    branches: [ production ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_PREFIX: ${{ github.repository_owner }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🔐 Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 📥 Pull latest images
+      run: |
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/frankenstein-db:latest
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/ai-scraper-vm:latest
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/ai-scraper-dashboard:latest
+
+    - name: 🧪 Verify images
+      run: |
+        docker images | grep ${{ env.IMAGE_NAME_PREFIX }}
+        echo "✅ All images pulled successfully"
+
+    - name: 🚀 Deploy to ${{ github.event.inputs.environment || 'production' }}
+      run: |
+        echo "🚀 Deploying AI Scraper System with Ollama to ${{ github.event.inputs.environment || 'production' }}"
+
+        # Create deployment directory
+        mkdir -p deployment
+        cd deployment
+
+        # Copy deployment files
+        cp ../docker-compose.ollama.yml docker-compose.yml
+
+        # Update image references if needed
+        sed -i "s|image: ghcr.io/scrapedat/|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/${{ env.IMAGE_NAME_PREFIX }}/|g" docker-compose.yml
+
+        # Start the system
+        docker-compose up -d
+
+        # Wait for services to be healthy
+        echo "⏳ Waiting for services to start..."
+        sleep 60
+
+        # Initialize Ollama models
+        echo "🤖 Setting up Ollama models..."
+        docker-compose exec -T ollama ollama pull llama3.1:8b
+        docker-compose exec -T ollama ollama pull llama3.1:70b
+
+        # Check service status
+        docker-compose ps
+
+        echo "✅ Deployment completed successfully!"
+        echo "🔗 Dashboard: http://localhost:3000"
+        echo "📡 MQTT: localhost:1883"
+        echo "🧠 Ollama API: http://localhost:11434"
+        echo "🤖 Small Model: llama3.1:8b (fast inference)"
+        echo "🧠 Large Model: llama3.1:70b (deep analysis)"
+
+    - name: 📊 Deployment Summary
+      run: |
+        echo "## 🚀 Deployment Summary with Ollama" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "- **AI Models:**" >> $GITHUB_STEP_SUMMARY
+        echo "  - Llama 3.1 8B: Fast inference, real-time scraping" >> $GITHUB_STEP_SUMMARY
+        echo "  - Llama 3.1 70B: Deep analysis, complex reasoning" >> $GITHUB_STEP_SUMMARY
+        echo "- **Docker Images:**" >> $GITHUB_STEP_SUMMARY
+        echo "  - FrankensteinDB: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/frankenstein-db:latest" >> $GITHUB_STEP_SUMMARY
+        echo "  - AI Scraper VM: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/ai-scraper-vm:latest" >> $GITHUB_STEP_SUMMARY
+        echo "  - Dashboard: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}/ai-scraper-dashboard:latest" >> $GITHUB_STEP_SUMMARY
+        echo "  - Ollama: ollama/ollama:latest (with GPU)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🛡️ License Protection" >> $GITHUB_STEP_SUMMARY
+        echo "All components are protected by AGPL-3.0 license" >> $GITHUB_STEP_SUMMARY
+        echo "Ollama models run locally - no API costs!" >> $GITHUB_STEP_SUMMARY

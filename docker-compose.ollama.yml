@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # FrankensteinDB - Hybrid SQLite + Redis + Blob Storage
+  frankenstein-db:
+    image: ghcr.io/scrapedat/frankenstein-db:latest
+    container_name: frankenstein-db
+    restart: unless-stopped
+    environment:
+      - PUID=1001
+      - PGID=1001
+    volumes:
+      - frankenstein_data:/data
+    networks:
+      - ai-scraper-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/data/database.db').close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Scraper VM - Intelligent web scraping with browser automation
+  ai-scraper-vm:
+    image: ghcr.io/scrapedat/ai-scraper-vm:latest
+    container_name: ai-scraper-vm
+    restart: unless-stopped
+    depends_on:
+      frankenstein-db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - DATABASE_URL=postgresql://frankenstein:frankenstein@frankenstein-db:5432/scraper
+      - OLLAMA_HOST=http://ollama:11434
+      - SMALL_MODEL=llama3.1:8b
+      - LARGE_MODEL=llama3.1:70b
+    volumes:
+      - scraper_data:/app/data
+      - scraper_logs:/app/logs
+    networks:
+      - ai-scraper-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import paho.mqtt.client as mqtt; mqtt.Client().connect('mosquitto', 1883, 60)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dashboard - Real-time monitoring and control interface
+  ai-scraper-dashboard:
+    image: ghcr.io/scrapedat/ai-scraper-dashboard:latest
+    container_name: ai-scraper-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      frankenstein-db:
+        condition: service_healthy
+      ai-scraper-vm:
+        condition: service_healthy
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
+      - REACT_APP_MQTT_URL=ws://localhost:9001
+      - REACT_APP_DATABASE_URL=http://localhost:3002
+    networks:
+      - ai-scraper-network
+
+  # Ollama - Local LLM service with GPU acceleration
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_GPU_LAYERS=60  # Max layers for 70B model
+      - OLLAMA_MAX_LOADED_MODELS=2  # Allow both small and large models
+      - OLLAMA_MAX_QUEUE=512  # Handle multiple concurrent requests
+      - OLLAMA_RUNNERS_DIR=/tmp/runners
+    networks:
+      - ai-scraper-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 64G  # Plenty of RAM for large models
+
+  # MQTT Broker - Real-time communication between components
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      - ai-scraper-network
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "test", "-C", "1", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  frankenstein_data:
+    driver: local
+  scraper_data:
+    driver: local
+  scraper_logs:
+    driver: local
+  ollama_data:
+    driver: local
+  mosquitto_data:
+    driver: local
+  mosquitto_logs:
+    driver: local
+
+networks:
+  ai-scraper-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
