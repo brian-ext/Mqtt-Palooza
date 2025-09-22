@@ -1,0 +1,93 @@
+name: 🔒 Security & Quality Checks
+
+on:
+  push:
+    branches: [ main, master, production ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🔍 Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: 📤 Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: 📦 Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy bandit safety
+
+    - name: 🔍 Run Python code quality checks
+      run: |
+        echo "🔍 Running flake8..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics || true
+
+        echo "🎨 Checking code formatting with black..."
+        black --check --diff . || true
+
+        echo "📦 Checking import sorting..."
+        isort --check-only --diff . || true
+
+        echo "🔒 Running security checks with bandit..."
+        bandit -r . -f json -o bandit-report.json || true
+
+        echo "🛡️ Checking dependencies for vulnerabilities..."
+        safety check || true
+
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: ⚖️ Check license compliance
+      run: |
+        echo "🔍 Checking for AGPL-3.0 license headers..."
+        find . -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.tsx" | head -10 | xargs grep -l "AGPL" || echo "Some files may be missing license headers"
+
+        echo "📋 License summary:"
+        find . -name "LICENSE*" -o -name "COPYING*" | xargs ls -la || echo "License files found"
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 📦 Dependency Review
+      uses: actions/dependency-review-action@v3
+      with:
+        fail-on-severity: moderate

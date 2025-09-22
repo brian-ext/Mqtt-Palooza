@@ -2,10 +2,10 @@ name: 🚀 Publish Docker Containers to GitHub Registry
 
 on:
   push:
-    branches: [ main, production ]
+    branches: [ main, master, production ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 env:
   REGISTRY: ghcr.io
