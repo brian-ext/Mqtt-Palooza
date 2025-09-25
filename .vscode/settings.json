@@ -1,3 +1,20 @@
 {
-    "markdown.validate.enabled": true
+    "markdown.validate.enabled": true,
+    "Super_code_completion": true
+
+
+    "editor.definitionLinkOpensInPeek":true,
+    "editor.codeLens": true,
+
+    "typescript.tsdk": 
+    "node_modules/typescript/lib":"[code-referencing]": {
+     "path": "./node_modules/typescript/lib"
+    },
+    "javascript.suggest.autoImports": true,
+    "typescript.suggest.autoImports": true,
+    "python.suggest.autoImports": true,
+    "code-referencing": {
+        "path": "/home/b/teamai/production-VMs"
+        
+    }   
 }
