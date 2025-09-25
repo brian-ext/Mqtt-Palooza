@@ -29,7 +29,7 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
-     environment:
+    environment:
        - DATABASE_URL=postgresql://frankenstein:frankenstein@frankenstein-db:5432/scraper
        - OLLAMA_HOST=http://ollama-proxy:80
        - OLLAMA_USERNAME=${OLLAMA_USERNAME:-ollama}
