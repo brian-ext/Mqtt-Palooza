@@ -45,7 +45,6 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ai_scraper_data:/app/data
     networks:
       - ai-scraper-network
@@ -53,10 +52,6 @@ services:
       - FRANKENSTEIN_DB_HOST=frankenstein-db
       - REDIS_HOST=redis
       - MQTT_BROKER_HOST=mqtt-broker
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
     labels:
       - "org.opencontainers.image.licenses=AGPL-3.0"
       - "org.opencontainers.image.vendor=AI Scraper Contributors"
