@@ -175,4 +175,3 @@ def test_scraping_task_retry():
 def test_scraping_task_timeout():
     """Test timeout handling in scraping tasks."""
     pass
-```
